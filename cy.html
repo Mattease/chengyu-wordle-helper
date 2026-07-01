@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成语接龙助手</title>
+    <!-- pinyin-pro：必须指定 dist/index.js，裸路径会加载 ESM 模块导致浏览器报错 -->
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.26.0/dist/index.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 660px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(90deg, #f7971e, #ffd200);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 13px;
+            color: #8888aa;
+            margin-bottom: 20px;
+        }
+
+
+        .card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card h3 .step-badge {
+            background: linear-gradient(135deg, #f7971e, #ffd200);
+            color: #1a1a2e;
+            font-size: 12px;
+            font-weight: 900;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Status badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            transition: all 0.4s ease;
+        }
+        .status-loading {
+            background: rgba(255, 193, 7, 0.15);
+            color: #ffd54f;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+        .status-ready {
+            background: rgba(76, 175, 80, 0.15);
+            color: #81c784;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        .status-error {
+            background: rgba(244, 67, 54, 0.15);
+            color: #ef9a9a;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-loading { animation: pulse 1.5s ease-in-out infinite; }
+
+        /* Input area */
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 18px;
+            font-family: inherit;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]::placeholder { color: #666; }
+        input[type="text"]:focus { border-color: #ffd200; }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-family: inherit;
+            font-weight: 700;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f7971e, #ffd200);
+            color: #1a1a2e;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(247, 151, 30, 0.4);
+        }
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-search {
+            width: 100%;
+            margin-top: 16px;
+            padding: 14px;
+            font-size: 17px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            transition: all 0.25s ease;
+        }
+        .btn-search:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-search:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+            padding: 12px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .legend-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .legend-dot.unknown { background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.2); }
+        .legend-dot.gray { background: #3a3a4a; border: 2px solid #555; }
+        .legend-dot.green { background: #2d8a4e; }
+        .legend-dot.red { background: #d32f2f; }
+
+        .tip-text {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .tip-text .t-sm { color: #ffa3a3; }
+        .tip-text .t-ym { color: #a3d4ff; }
+        .tip-text .t-sd { color: #c4a3ff; }
+
+        /* Character display area */
+        .idiom-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .char-box {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px 6px;
+            text-align: center;
+        }
+
+        .char-pinyin {
+            font-size: 13px;
+            color: #f7971e;
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+
+        .char-name {
+            font-size: 30px;
+            font-weight: 900;
+            color: #fff;
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+
+        /* Part buttons - large, clearly separated */
+        .part-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .part-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: inherit;
+            padding: 8px 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .part-btn:active { transform: scale(0.93); }
+
+        .part-btn .part-label {
+            font-size: 10px;
+            font-weight: 500;
+            opacity: 0.7;
+        }
+
+        .part-btn .part-value {
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        /* Unknown (default, ignored) */
+        .part-btn.state-unknown {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #ddd;
+        }
+        .part-btn.state-unknown:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .part-btn.state-unknown .status-icon::after { content: ''; }
+
+        /* Absent (gray) */
+        .part-btn.state-absent {
+            background: #2a2a35;
+            border-color: #444;
+            color: #888;
+        }
+        .part-btn.state-absent .status-icon::after { content: '✕'; font-size: 10px; }
+
+        /* Correct (green) */
+        .part-btn.state-correct {
+            background: linear-gradient(135deg, #1b7a3d, #2d8a4e);
+            border-color: #3dba6a;
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(45, 138, 78, 0.3);
+        }
+        .part-btn.state-correct .status-icon::after { content: '✓'; font-size: 11px; }
+
+        /* Present (red) */
+        .part-btn.state-present {
+            background: linear-gradient(135deg, #c62828, #d32f2f);
+            border-color: #f44336;
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(211, 47, 47, 0.3);
+        }
+        .part-btn.state-present .status-icon::after { content: '↔'; font-size: 11px; }
+
+        .status-icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Type-specific colored borders */
+        .type-sm .part-label { color: #ffa3a3; }
+        .type-sm.state-absent { border-color: #6b4444; }
+
+        .type-ym .part-label { color: #a3d4ff; }
+        .type-ym.state-absent { border-color: #44566b; }
+
+        .type-sd .part-label { color: #c4a3ff; }
+        .type-sd.state-absent { border-color: #5b446b; }
+
+        /* Results area */
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .result-count {
+            font-size: 14px;
+            color: #999;
+        }
+        .result-count strong {
+            color: #ffd200;
+            font-size: 18px;
+        }
+
+        .result-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            max-height: 350px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .result-list::-webkit-scrollbar { width: 6px; }
+        .result-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 3px; }
+        .result-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: default;
+            transition: all 0.2s;
+        }
+        .result-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .no-result {
+            color: #888;
+            font-size: 14px;
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .result-overflow-tip {
+            color: #777;
+            font-size: 12px;
+            width: 100%;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        /* Tooltip toast */
+        .state-tip {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(0, 0, 0, 0.88);
+            color: #fff;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s, transform 0.25s;
+        }
+        .state-tip.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* Empty state */
+        .empty-hint {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            padding: 30px 10px;
+        }
+        .empty-hint .emoji {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* Animations */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .char-box { animation: slideUp 0.3s ease both; }
+        .char-box:nth-child(1) { animation-delay: 0s; }
+        .char-box:nth-child(2) { animation-delay: 0.05s; }
+        .char-box:nth-child(3) { animation-delay: 0.1s; }
+        .char-box:nth-child(4) { animation-delay: 0.15s; }
+
+        @keyframes pop {
+            0% { transform: scale(0.93); }
+            60% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .part-btn.pop-anim { animation: pop 0.25s ease; }
+
+        /* Responsive */
+        @media (max-width: 420px) {
+            .idiom-row { gap: 6px; }
+            .char-name { font-size: 24px; }
+            .part-btn { padding: 6px 3px; font-size: 12px; }
+            .part-btn .part-value { font-size: 13px; }
+        }
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 成语接龙助手</h1>
+        <p class="subtitle">集成万级开源词库 · 智能拼音解析 · 作者 @摸鱼群男高</p>
+
+        <div class="card">
+            <div id="status" class="status-badge status-loading">⏳ 正在连接开源成语词库…</div>
+
+            <h3><span class="step-badge">1</span> 输入尝试的成语</h3>
+            <div class="input-group">
+                <input type="text" id="idiomInput" placeholder="输入4字成语，如：五颜六色" maxlength="4">
+                <button id="parseBtn" class="btn btn-primary" onclick="loadIdiom()" disabled>解析</button>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot green"></div>
+                    <span>正确 ✓</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot red"></div>
+                    <span>位置错 ↔</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot gray"></div>
+                    <span>不存在 ✕</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot unknown"></div>
+                    <span>忽略 ⚪</span>
+                </div>
+            </div>
+
+            <p class="tip-text">👆 点击每个<span class="t-sm">声母</span>、<span class="t-ym">韵母</span>、<span class="t-sd">声调</span>按钮切换状态</p>
+
+            <div class="idiom-row" id="clueRow">
+                <div class="empty-hint" style="grid-column: 1/-1;">
+                    <span class="emoji">📝</span>
+                    输入成语后，这里会显示拼音分解
+                </div>
+            </div>
+
+            <button id="filterBtn" class="btn-search" onclick="filterIdioms()" disabled>🔍 全库筛选匹配成语</button>
+        </div>
+
+        <div class="card">
+            <div class="result-header">
+                <h3><span class="step-badge">2</span> 匹配结果</h3>
+                <span class="result-count">找到 <strong id="count">0</strong> 个</span>
+            </div>
+            <div class="result-list" id="results">
+                <div class="no-result">尚未筛选</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- State change toast -->
+    <div class="state-tip" id="stateTip"></div>
+
+    <script>
+        // ===== 全局变量 =====
+        let idiomDatabase = [];
+        let currentGuessPinyin = [];
+
+        // ===== 声调符号映射（用于显示完整拼音） =====
+        const toneMap = {
+            'a': ['ā', 'á', 'ǎ', 'à'],
+            'e': ['ē', 'é', 'ě', 'è'],
+            'i': ['ī', 'í', 'ǐ', 'ì'],
+            'o': ['ō', 'ó', 'ǒ', 'ò'],
+            'u': ['ū', 'ú', 'ǔ', 'ù'],
+            'ü': ['ǖ', 'ǘ', 'ǚ', 'ǜ'],
+        };
+
+        // ===== 反向映射：带声调字母 → [原始字母, 声调数字] =====
+        const TONE_CHAR_MAP = {};
+        for (const [base, toned] of Object.entries(toneMap)) {
+            toned.forEach((ch, idx) => {
+                TONE_CHAR_MAP[ch] = [base, String(idx + 1)];
+            });
+        }
+
+        // ===== 声母列表（长的排前面，避免 zh 被匹配为 z） =====
+        const INITIALS = ['zh', 'ch', 'sh', 'b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'r', 'z', 'c', 's', 'y', 'w'];
+
+        // ===== 从带声调的拼音字符串解析为 {sm, ym, sd} =====
+        // 输入："wǔ yán liù sè"
+        // 输出：[{sm:"w",ym:"u",sd:"3"}, {sm:"y",ym:"an",sd:"2"}, ...]
+        function parsePinyinString(pinyinStr) {
+            if (!pinyinStr) return null;
+            const syllables = pinyinStr.trim().split(/\s+/);
+            if (syllables.length < 4) return null;
+
+            return syllables.slice(0, 4).map(syl => {
+                // 1. 提取声调，同时将带声调字母还原为普通字母
+                let tone = '0';
+                let plainSyl = '';
+                for (const ch of syl) {
+                    if (TONE_CHAR_MAP[ch]) {
+                        plainSyl += TONE_CHAR_MAP[ch][0];
+                        tone = TONE_CHAR_MAP[ch][1];
+                    } else {
+                        plainSyl += ch;
+                    }
+                }
+
+                // 2. 提取声母
+                let initial = '';
+                for (const ini of INITIALS) {
+                    if (plainSyl.startsWith(ini)) {
+                        initial = ini;
+                        break;
+                    }
+                }
+
+                // 3. 韵母 = 去掉声母后的部分
+                let final_ = plainSyl.substring(initial.length);
+
+                return { sm: initial, ym: final_, sd: tone };
+            });
+        }
+
+        // ===== 给韵母加声调符号（用于显示） =====
+        function addTone(ym, tone) {
+            if (!ym || tone === '0' || tone === 0) return ym;
+            const t = parseInt(tone) - 1;
+            if (t < 0 || t > 3) return ym;
+            const priority = ['a', 'e', 'o'];
+            for (let p of priority) {
+                if (ym.includes(p) && toneMap[p] && toneMap[p][t]) {
+                    return ym.replace(p, toneMap[p][t]);
+                }
+            }
+            const vowels = 'iuü';
+            for (let i = ym.length - 1; i >= 0; i--) {
+                if (vowels.includes(ym[i]) && toneMap[ym[i]] && toneMap[ym[i]][t]) {
+                    return ym.substring(0, i) + toneMap[ym[i]][t] + ym.substring(i + 1);
+                }
+            }
+            return ym;
+        }
+
+        function getFullPinyin(py) {
+            return (py.sm || '') + addTone(py.ym, py.sd);
+        }
+
+        // ===== 用 pinyin-pro 解析用户输入的汉字 =====
+        function parsePinyinFromChars(word) {
+            if (window.pinyinPro) {
+                try {
+                    // 获取带声调符号的拼音字符串，然后用 parsePinyinString 解析
+                    // 必须关闭 toneSandhi (一不变调)，否则"出师不利"的"不"会变成二声，导致和游戏不一致
+                    const pyStr = pinyinPro.pinyin(word, { toneType: 'symbol', type: 'array', toneSandhi: false }).join(' ');
+                    const result = parsePinyinString(pyStr);
+                    if (result) return result;
+                } catch (e) {
+                    console.warn('pinyin-pro 解析失败:', e);
+                }
+            }
+            return Array(word.length).fill(0).map(() => ({ sm: '?', ym: '?', sd: '?' }));
+        }
+
+        // ===== 状态管理 =====
+        const stateNames = {
+            'unknown': '⚪ 忽略',
+            'correct': '✅ 正确',
+            'present': '🔄 位置错',
+            'absent': '❌ 不存在'
+        };
+        const stateOrder = ['unknown', 'correct', 'present', 'absent'];
+
+        function showTip(text) {
+            const tip = document.getElementById('stateTip');
+            tip.textContent = text;
+            tip.classList.add('visible');
+            clearTimeout(tip._timer);
+            tip._timer = setTimeout(() => tip.classList.remove('visible'), 800);
+        }
+
+        function toggleState(el) {
+            const currentState = el.dataset.state || 'unknown';
+            const idx = stateOrder.indexOf(currentState);
+            const nextState = stateOrder[(idx + 1) % stateOrder.length];
+
+            el.dataset.state = nextState;
+            el.className = el.className.replace(/state-\w+/, 'state-' + nextState);
+
+            el.classList.remove('pop-anim');
+            void el.offsetWidth;
+            el.classList.add('pop-anim');
+
+            const typeLabels = { sm: '声母', ym: '韵母', sd: '声调' };
+            const type = el.dataset.type;
+            const val = el.querySelector('.part-value').textContent;
+            showTip(`${typeLabels[type]}「${val}」→ ${stateNames[nextState]}`);
+        }
+
+        // ===== 声调标签 =====
+        function toneLabel(sd) {
+            const labels = { '1': '一声 ˉ', '2': '二声 ˊ', '3': '三声 ˇ', '4': '四声 ˋ', '0': '轻声' };
+            return labels[sd] || sd;
+        }
+
+        // ===== 加载成语到UI =====
+        function loadIdiom() {
+            const word = document.getElementById('idiomInput').value.trim();
+            if (word.length !== 4) {
+                alert('请输入标准的4字成语！');
+                return;
+            }
+
+            currentGuessPinyin = parsePinyinFromChars(word);
+
+            // 如果数据库里有这个词，优先用数据库的拼音（更准确）
+            const dbEntry = idiomDatabase.find(item => item.word === word);
+            if (dbEntry && dbEntry.py) {
+                currentGuessPinyin = dbEntry.py;
+                console.log(`[成语助手] 使用数据库拼音: ${word} →`, currentGuessPinyin);
+            } else {
+                console.log(`[成语助手] 使用 pinyin-pro 解析: ${word} →`, currentGuessPinyin);
+            }
+
+            const container = document.getElementById('clueRow');
+            let html = '';
+
+            word.split('').forEach((char, idx) => {
+                const py = currentGuessPinyin[idx];
+                const fullPy = getFullPinyin(py);
+                html += `
+                    <div class="char-box">
+                        <div class="char-pinyin">${fullPy}</div>
+                        <div class="char-name">${char}</div>
+                        <div class="part-group">
+                            <div class="part-btn type-sm state-unknown"
+                                 data-pos="${idx}" data-type="sm" data-state="unknown"
+                                 onclick="toggleState(this)">
+                                <span class="status-icon"></span>
+                                <span class="part-label">声</span>
+                                <span class="part-value">${py.sm || '∅'}</span>
+                            </div>
+                            <div class="part-btn type-ym state-unknown"
+                                 data-pos="${idx}" data-type="ym" data-state="unknown"
+                                 onclick="toggleState(this)">
+                                <span class="status-icon"></span>
+                                <span class="part-label">韵</span>
+                                <span class="part-value">${py.ym}</span>
+                            </div>
+                            <div class="part-btn type-sd state-unknown"
+                                 data-pos="${idx}" data-type="sd" data-state="unknown"
+                                 onclick="toggleState(this)">
+                                <span class="status-icon"></span>
+                                <span class="part-label">调</span>
+                                <span class="part-value">${toneLabel(py.sd)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // ===== 筛选逻辑（正确的 Wordle 重复值算法） =====
+        function filterIdioms() {
+            if (currentGuessPinyin.length === 0) {
+                alert('请先输入并解析一个成语！');
+                return;
+            }
+
+            const resContainer = document.getElementById('results');
+            resContainer.innerHTML = '<div class="no-result">⏳ 正在筛选中…</div>';
+
+            const parts = document.querySelectorAll('.part-btn');
+            const constraints = [];
+
+            parts.forEach(el => {
+                const pos = parseInt(el.dataset.pos);
+                const type = el.dataset.type;
+                const val = currentGuessPinyin[pos][type];
+                const status = el.dataset.state || 'unknown';
+                if (status !== 'unknown') {
+                    constraints.push({ pos, type, val, status });
+                }
+            });
+
+            // 标准 Wordle 算法：按 (type, val) 分组
+            const valueInfo = {};
+            for (const c of constraints) {
+                const key = `${c.type}:${c.val}`;
+                if (!valueInfo[key]) {
+                    valueInfo[key] = { type: c.type, val: c.val, greens: [], oranges: [], hasGray: false };
+                }
+                if (c.status === 'correct') valueInfo[key].greens.push(c.pos);
+                else if (c.status === 'present') valueInfo[key].oranges.push(c.pos);
+                else valueInfo[key].hasGray = true;
+            }
+
+            // Debug: 打印约束条件
+            console.log('[成语助手] 筛选约束:');
+            for (const key in valueInfo) {
+                const info = valueInfo[key];
+                const desc = [];
+                if (info.greens.length > 0) desc.push(`绿@位置${info.greens.join(',')}`);
+                if (info.oranges.length > 0) desc.push(`橙@位置${info.oranges.join(',')}`);
+                if (info.hasGray) desc.push('有灰');
+                const knownCount = info.greens.length + info.oranges.length;
+                if (info.hasGray) {
+                    desc.push(`答案中精确${knownCount}个`);
+                } else if (knownCount > 0) {
+                    desc.push(`答案中至少${knownCount}个`);
+                }
+                console.log(`  ${key} → ${desc.join(', ')}`);
+            }
+
+            const rules = Object.values(valueInfo);
+
+            setTimeout(() => {
+                const startTime = performance.now();
+
+                const filtered = idiomDatabase.filter(item => {
+                    if (!item.py) return false; // 没有拼音数据的跳过
+
+                    const py = item.py;
+
+                    for (let i = 0; i < rules.length; i++) {
+                        const { type, val, greens, oranges, hasGray } = rules[i];
+
+                        // 绿色：该位置必须是该值
+                        for (let j = 0; j < greens.length; j++) {
+                            if (py[greens[j]][type] !== val) return false;
+                        }
+
+                        // 橙色：该位置不能是该值
+                        for (let j = 0; j < oranges.length; j++) {
+                            if (py[oranges[j]][type] === val) return false;
+                        }
+
+                        // 数量约束
+                        const knownCount = greens.length + oranges.length;
+                        if (hasGray || knownCount > 0) {
+                            let count = 0;
+                            if (py[0][type] === val) count++;
+                            if (py[1][type] === val) count++;
+                            if (py[2][type] === val) count++;
+                            if (py[3][type] === val) count++;
+
+                            if (hasGray) {
+                                if (count !== knownCount) return false;
+                            } else if (count < knownCount) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                });
+
+                const elapsed = (performance.now() - startTime).toFixed(1);
+                console.log(`[成语助手] 筛选完成: ${filtered.length} 条匹配 (耗时 ${elapsed}ms)`);
+
+                document.getElementById('count').innerText = filtered.length;
+
+                if (filtered.length === 0) {
+                    resContainer.innerHTML = '<div class="no-result">没有找到匹配的成语 😥<br><span style="font-size:12px;opacity:0.6">试试调整标记，或按 F12 打开控制台查看约束详情</span></div>';
+                    return;
+                }
+
+                let html = '';
+                const displayLimit = filtered.slice(0, 300);
+                for (let i = 0; i < displayLimit.length; i++) {
+                    const item = displayLimit[i];
+                    const pyStr = getFullPinyin(item.py[0]) + ' ' + 
+                                  getFullPinyin(item.py[1]) + ' ' + 
+                                  getFullPinyin(item.py[2]) + ' ' + 
+                                  getFullPinyin(item.py[3]);
+                    html += `<div class="result-item">${item.word}<div style="font-size:11px;opacity:0.5;margin-top:2px;">${pyStr}</div></div>`;
+                }
+
+                if (filtered.length > 300) {
+                    html += `<div class="result-overflow-tip">⚠️ 结果过多(${filtered.length}条)，仅显示前 300 个</div>`;
+                }
+                resContainer.innerHTML = html;
+            }, 50);
+        }
+
+        // ===== 初始化：加载词库 =====
+        window.onload = async function () {
+            const statusEl = document.getElementById('status');
+            const parseBtn = document.getElementById('parseBtn');
+            const filterBtn = document.getElementById('filterBtn');
+
+            try {
+                // 从 pwxcoo/chinese-xinhua 开源词库加载（增加多个镜像防屏蔽）
+                const urls = [
+                    'https://fastly.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/idiom.json',
+                    'https://gcore.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/idiom.json',
+                    'https://cdn.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/idiom.json'
+                ];
+                let response = null;
+                for (const url of urls) {
+                    try {
+                        response = await fetch(url);
+                        if (response.ok) break;
+                    } catch(e) {
+                        console.warn('词库镜像连接失败:', url);
+                    }
+                }
+                if (!response || !response.ok) throw new Error('所有词库镜像均无法连接');
+                const rawData = await response.json();
+
+                // 过滤4字成语，并用数据库自带的 pinyin 字段预解析
+                let parsed = 0, failed = 0;
+                idiomDatabase = [];
+
+                for (const item of rawData) {
+                    if (!item.word || item.word.length !== 4) continue;
+                    const py = parsePinyinString(item.pinyin);
+                    if (py) {
+                        idiomDatabase.push({ word: item.word, py });
+                        parsed++;
+                    } else {
+                        failed++;
+                    }
+                }
+
+                console.log(`[成语助手] 词库加载完成: ${parsed} 条成功, ${failed} 条失败`);
+                // 抽样检验
+                const sample = idiomDatabase[Math.floor(Math.random() * idiomDatabase.length)];
+                if (sample) {
+                    console.log(`[成语助手] 抽样: ${sample.word} →`, sample.py.map(p => `${p.sm}|${p.ym}|${p.sd}`).join(', '));
+                }
+
+                statusEl.className = 'status-badge status-ready';
+                statusEl.textContent = `🟢 词库就绪：${idiomDatabase.length.toLocaleString()} 条成语（拼音已预解析）`;
+
+            } catch (error) {
+                console.error('加载在线词库失败:', error);
+
+                // 兜底词库（用 pinyin-pro 解析）
+                const fallbackWords = [
+                    "五颜六色", "七上八下", "肝脑涂地", "原形毕露", "古色古香",
+                    "瘦骨嶙峋", "肝肠寸断", "干脆利落", "无法无天", "一心一意",
+                    "三心二意", "自言自语", "一目了然", "大显身手", "马到成功",
+                    "一举两得", "半途而废", "画蛇添足", "亡羊补牢", "守株待兔",
+                    "刻舟求剑", "掩耳盗铃", "狐假虎威", "井底之蛙", "胸有成竹",
+                    "对牛弹琴", "叶公好龙", "杯弓蛇影", "自相矛盾", "望梅止渴"
+                ];
+                idiomDatabase = fallbackWords.map(w => ({ word: w, py: parsePinyinFromChars(w) }));
+
+                statusEl.className = 'status-badge status-error';
+                statusEl.textContent = `⚠️ 网络连接失败，已启用内置词库（${idiomDatabase.length} 条）`;
+            }
+
+            parseBtn.disabled = false;
+            filterBtn.disabled = false;
+        };
+
+        // 回车快捷键
+        document.getElementById('idiomInput').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') loadIdiom();
+        });
+
+
+    </script>
+</body>
+</html>
